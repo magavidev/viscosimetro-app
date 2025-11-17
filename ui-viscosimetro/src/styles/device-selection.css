@@ -1,0 +1,277 @@
+.device-selection-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f6fb;
+}
+
+.device-selection-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 1.5rem;
+}
+
+.device-selection-container {
+  width: 100%;
+  max-width: 1040px;
+  display: flex;
+  flex-direction: column;
+  gap: 2.75rem;
+}
+
+.device-selection-card {
+  border-radius: 32px;
+  border: 1px solid #e4e7f2;
+  background: #ffffff;
+  box-shadow: 0 28px 68px rgba(31, 34, 53, 0.12);
+  padding: clamp(2.5rem, 5vw, 3.25rem);
+}
+
+.device-selection-header {
+  text-align: center;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.device-selection-title {
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: #1f2333;
+  letter-spacing: -0.01em;
+}
+
+.device-selection-subtitle {
+  font-size: 0.95rem;
+  color: #777c97;
+}
+
+.device-selection-grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (min-width: 960px) {
+  .device-selection-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.device-card {
+  position: relative;
+  border: 1px solid #e4e7f2;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  display: grid;
+  gap: 1rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  box-shadow: 0 18px 42px -26px rgba(31, 34, 53, 0.25);
+  cursor: pointer;
+}
+
+.device-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 24px 48px -24px rgba(31, 34, 53, 0.32);
+  border-color: #d8dcf0;
+}
+
+.device-card:focus-visible {
+  outline: 3px solid #c8ccff;
+  outline-offset: 2px;
+}
+
+.device-card:disabled,
+.device-card[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+  background: #f5f6fb;
+}
+
+.device-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  box-shadow: 0 20px 32px -26px rgba(70, 90, 255, 0.45);
+}
+
+.device-icon.blue {
+  background: rgba(97, 143, 255, 0.15);
+  color: #3a66e5;
+}
+
+.device-icon.green {
+  background: rgba(88, 213, 162, 0.16);
+  color: #1f9a75;
+}
+
+.device-icon.orange {
+  background: rgba(255, 193, 121, 0.16);
+  color: #d98232;
+  box-shadow: none;
+}
+
+.device-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2333;
+}
+
+.device-card-description {
+  font-size: 0.9rem;
+  color: #7a7f98;
+  line-height: 1.55;
+}
+
+.device-selection-note {
+  margin-top: 1.75rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid #ebeef7;
+  font-size: 0.9rem;
+  text-align: center;
+  color: #8a8fab;
+}
+
+.user-config-card {
+  border-radius: 30px;
+  border: 1px solid #e5e7f2;
+  background: #ffffff;
+  box-shadow: 0 26px 60px -28px rgba(31, 34, 53, 0.18);
+  padding: clamp(2.5rem, 5vw, 3rem);
+  text-align: center;
+  display: grid;
+  gap: 2rem;
+}
+
+.user-config-title {
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: #1f2333;
+}
+
+.user-config-subtitle {
+  font-size: 0.95rem;
+  color: #7c81a1;
+}
+
+.user-config-action {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.user-config-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1.4rem 1.5rem;
+  border-radius: 24px;
+  border: 1px solid #e5e7f5;
+  background: #f7f8fe;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #514ccf;
+  box-shadow: 0 22px 48px -28px rgba(92, 98, 238, 0.32);
+}
+
+.user-config-trigger svg {
+  width: 24px;
+  height: 24px;
+}
+
+.footer-shell,
+.status-shell {
+  background: transparent;
+}
+
+.status-shell .status-bar,
+.footer-shell .footer-bar {
+  max-width: 1040px;
+  margin: 0 auto;
+  border: none;
+  background: transparent;
+}
+
+.footer-shell {
+  padding-bottom: 1.5rem;
+}
+.user-config-action button {
+  width: 100%;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.35rem 1.5rem;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #f2f3ff 0%, #ebeefe 100%);
+  color: #514ccf;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 18px 40px -24px rgba(79, 84, 224, 0.35);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.user-config-action button:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 44px -22px rgba(79, 84, 224, 0.38);
+}
+
+.user-config-action button:focus-visible {
+  outline: 3px solid #c8ccff;
+  outline-offset: 2px;
+}
+
+.user-config-action button .lucide {
+  width: 22px;
+  height: 22px;
+}
+
+.user-config-action button .text-muted-foreground,
+.user-config-action button p,
+.user-config-action button span {
+  color: inherit;
+}
+.user-config-action button {
+  flex-direction: column;
+  text-align: center;
+}
+
+.user-config-action button > div:first-child {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  background: rgba(81, 76, 207, 0.15);
+  color: #514ccf;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 18px 36px -26px rgba(81, 76, 207, 0.45);
+}
+
+.user-config-action button > div:last-child {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.user-config-action button h3,
+.user-config-action button p {
+  margin: 0;
+}
+
+.user-config-action button h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #514ccf;
+}
+
+.user-config-action button p {
+  font-size: 0.9rem;
+  color: #696fb0;
+}
