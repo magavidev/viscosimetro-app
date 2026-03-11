@@ -8,6 +8,9 @@ import socketserver
 import threading
 import webbrowser
 
+# Legacy: mantener solo como referencia histórica.
+# Entry-point actual del proyecto: main.py
+
 # === CONFIG ===
 HTTP_PORT = 8780
 WS_PORT = 8781

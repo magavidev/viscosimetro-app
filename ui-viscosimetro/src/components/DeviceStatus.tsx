@@ -1,10 +1,10 @@
-import  { useEffect, useRef, useState } from "react";
+import type { ConnectionStatus } from "../types/measurement";
 
 interface DeviceStatusProps {
   isMeasuring: boolean;
   onMeasure: () => void;
   onReset: () => void;
-  connectionStatus: "connected" | "disconnected" | "error";
+  connectionStatus: ConnectionStatus;
   lastUpdate: Date;
   measurementCount: number;
 }
@@ -19,51 +19,14 @@ export function DeviceStatus({
   isMeasuring,
   onMeasure,
   onReset,
+  connectionStatus,
+  lastUpdate,
+  measurementCount,
 }: DeviceStatusProps) {
-  const [localStatus, setLocalStatus] = useState<"connected" | "disconnected" | "error">("disconnected");
-  const [count, setCount] = useState(0);
-  const [last, setLast] = useState(new Date());
-  const wsRef = useRef<WebSocket | null>(null);
-
-  useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8781");
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setLocalStatus("connected");
-      console.log("✅ WebSocket conectado");
-    };
-
-    ws.onmessage = (event) => {
-      console.log("📨 Datos recibidos:", event.data);
-
-      // ejemplo: "VIS:2.31;TEMP:23.4"
-      const now = new Date();
-      setLast(now);
-      setCount((prev) => prev + 1);
-
-      // si necesitas levantar alguna función:
-      // onMeasure(); // si se requiere actualizar el estado superior
-    };
-
-    ws.onerror = () => {
-      setLocalStatus("error");
-    };
-
-    ws.onclose = () => {
-      setLocalStatus("disconnected");
-      console.log("❌ WebSocket desconectado");
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-
   return (
     <section className="device-control-card">
-      <span className={`badge-status ${localStatus === "error" ? "error" : ""}`}>
-        {statusCopy[localStatus]}
+      <span className={`badge-status ${connectionStatus === "error" ? "error" : ""}`}>
+        {statusCopy[connectionStatus]}
       </span>
 
       <div className="device-control-actions">
@@ -71,7 +34,7 @@ export function DeviceStatus({
           type="button"
           className="control-button primary"
           onClick={onMeasure}
-          disabled={isMeasuring || localStatus !== "connected"}
+          disabled={isMeasuring || connectionStatus !== "connected"}
         >
           {isMeasuring ? "Generando lectura..." : "Iniciar medición"}
         </button>
@@ -86,9 +49,14 @@ export function DeviceStatus({
       </div>
 
       <div className="device-control-meta">
-        <span>Lecturas acumuladas: <strong>{count}</strong></span>
+        <span>Lecturas acumuladas: <strong>{measurementCount}</strong></span>
         <span>
-          Última actualización: {last.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          Última actualización:{" "}
+          {lastUpdate.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })}
         </span>
       </div>
     </section>

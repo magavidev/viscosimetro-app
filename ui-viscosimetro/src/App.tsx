@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { MeasurementCard } from "./components/MeasurementCard";
 import { DeviceStatus } from "./components/DeviceStatus";
 import { ViscosityChart } from "./components/ViscosityChart";
@@ -7,8 +7,11 @@ import { StatusBar } from "./components/StatusBar";
 import { FooterBar } from "./components/FooterBar";
 import { LoginScreen } from "./components/LoginScreen";
 import { DeviceSelection } from "./components/DeviceSelection";
+import { useDeviceWebSocket } from "./hooks/useDeviceWebSocket";
+import { useMeasurementSession } from "./hooks/useMeasurementSession";
 import "./styles/landing.css";
 import "./styles/dashboard.css";
+import type { DeviceType } from "./types/measurement";
 import {
   Thermometer,
   Gauge,
@@ -21,12 +24,12 @@ import {
   XCircle,
 } from "lucide-react";
 
-interface MeasurementData {
-  viscosity: number;
-  temperature: number;
-  standardDeviation: number;
-  timestamp: Date;
-}
+const formatDateLabel = (date: Date) =>
+  date.toLocaleDateString("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
 export default function App() {
   // Authentication state
@@ -37,7 +40,7 @@ export default function App() {
   } | null>(null);
   
   // Device selection state
-  const [selectedDevice, setSelectedDevice] = useState<'Q-VISC' | 'Q-DENS' | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceType | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<
     string | null
@@ -53,28 +56,6 @@ export default function App() {
   const [view, setView] = useState<
     "landing" | "realtime" | "data" | "calibration" | "settings"
   >("landing");
-  const [isMeasuring, setIsMeasuring] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<
-    "connected" | "disconnected" | "error"
-  >("connected");
-  const [currentData, setCurrentData] =
-    useState<MeasurementData>({
-      viscosity: 0,
-      temperature: 0,
-      standardDeviation: 0,
-      timestamp: new Date(),
-    });
-
-  const [historicalData, setHistoricalData] = useState<
-    Array<{
-      time: string;
-      viscosity: number;
-      temperature: number;
-      standardDeviation: number;
-    }>
-  >([]);
-
-  const [measurementCount, setMeasurementCount] = useState(0);
 
   // Calibration-specific state
   const [showPatternModal, setShowPatternModal] = useState(false);
@@ -92,120 +73,25 @@ export default function App() {
     networkMode: 'wifi'
   });
 
-  // Generate new measurement data
-  const generateNewReading = useCallback(() => {
-    const isQDENS = selectedDevice === 'Q-DENS';
-    return {
-      viscosity: isQDENS 
-        ? Number((0.8 + Math.random() * 0.4).toFixed(3)) // 0.8-1.2 g/cm³ range for density
-        : Number((80 + Math.random() * 80).toFixed(2)), // 80-160 cP range for viscosity
-      temperature: Number((20 + Math.random() * 10).toFixed(2)), // 20-30°C range
-      standardDeviation: isQDENS
-        ? Number((0.001 + Math.random() * 0.004).toFixed(4)) // smaller σ range for density
-        : Number((0.5 + Math.random() * 2).toFixed(2)), // 0.5-2.5 σ range for viscosity
-      timestamp: new Date(),
-    };
-  }, [selectedDevice]);
+  const {
+    isMeasuring,
+    currentData,
+    historicalData,
+    measurementCount,
+    hasWarnings,
+    applyReading,
+    startSimulatedMeasurement,
+    resetSession,
+    getViscosityStatus,
+    getTemperatureStatus,
+    getStdDevStatus,
+    getTrend,
+  } = useMeasurementSession(selectedDevice);
 
-  // Simulate a batch measurement process
-  const handleMeasurement = useCallback(async () => {
-    if (isMeasuring) return;
-
-    setIsMeasuring(true);
-    setConnectionStatus("connected");
-
-    // Simulate measurement time (3 seconds)
-    setTimeout(() => {
-      const newReading = generateNewReading();
-      setCurrentData(newReading);
-
-      // Add to historical data
-      setHistoricalData((prev) => {
-        const newDataPoint = {
-          time: newReading.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
-          viscosity: newReading.viscosity,
-          temperature: newReading.temperature,
-          standardDeviation: newReading.standardDeviation,
-        };
-
-        return [...prev, newDataPoint];
-      });
-
-      setMeasurementCount((prev) => prev + 1);
-      setIsMeasuring(false);
-    }, 3000);
-  }, [isMeasuring, generateNewReading]);
-
-  const handleReset = () => {
-    if (isMeasuring) return;
-
-    setCurrentData({
-      viscosity: 0,
-      temperature: 0,
-      standardDeviation: 0,
-      timestamp: new Date(),
-    });
-    setHistoricalData([]);
-    setMeasurementCount(0);
-  };
-
-  const getViscosityStatus = (viscosity: number) => {
-    if (viscosity === 0) return "normal"; // No measurement yet
-    
-    if (selectedDevice === 'Q-DENS') {
-      // Density ranges (g/cm³)
-      if (viscosity < 0.9 || viscosity > 1.1) return "critical";
-      if (viscosity < 0.95 || viscosity > 1.05) return "warning";
-      return "normal";
-    } else {
-      // Viscosity ranges (cP)
-      if (viscosity < 100 || viscosity > 150) return "critical";
-      if (viscosity < 110 || viscosity > 140) return "warning";
-      return "normal";
-    }
-  };
-
-  const getTemperatureStatus = (temp: number) => {
-    if (temp === 0) return "normal"; // No measurement yet
-    if (temp < 18 || temp > 30) return "critical";
-    if (temp < 20 || temp > 28) return "warning";
-    return "normal";
-  };
-
-  const getStdDevStatus = (stdDev: number) => {
-    if (stdDev === 0) return "normal"; // No measurement yet
-    if (stdDev > 2.0) return "critical";
-    if (stdDev > 1.5) return "warning";
-    return "normal";
-  };
-
-  const hasWarnings =
-    measurementCount > 0 &&
-    (getViscosityStatus(currentData.viscosity) !== "normal" ||
-      getTemperatureStatus(currentData.temperature) !==
-        "normal" ||
-      getStdDevStatus(currentData.standardDeviation) !==
-        "normal");
-
-  // Calculate trend based on last few data points
-  const getTrend = (
-    parameter:
-      | "viscosity"
-      | "temperature"
-      | "standardDeviation",
-  ) => {
-    if (historicalData.length < 2) return "stable";
-
-    const recent = historicalData.slice(-2);
-    const trend = recent[1][parameter] - recent[0][parameter];
-
-    if (Math.abs(trend) < 0.5) return "stable";
-    return trend > 0 ? "up" : "down";
-  };
+  const { connectionStatus } = useDeviceWebSocket({
+    enabled: isAuthenticated && selectedDevice !== null,
+    onReading: applyReading,
+  });
 
   // Calibration functions
   const startEvaluation = () => {
@@ -246,16 +132,7 @@ export default function App() {
     setCurrentUser(null);
     setSelectedDevice(null);
     setView("landing");
-    // Reset measurement data
-    setCurrentData({
-      viscosity: 0,
-      temperature: 0,
-      standardDeviation: 0,
-      timestamp: new Date(),
-    });
-    setHistoricalData([]);
-    setMeasurementCount(0);
-    setIsMeasuring(false);
+    resetSession();
     // Reset other states
     setSelectedFile(null);
     setSimulatedData([]);
@@ -267,35 +144,45 @@ export default function App() {
   };
 
   // Device selection function
-  const handleDeviceSelection = (device: 'Q-VISC' | 'Q-DENS') => {
+  const handleDeviceSelection = (device: DeviceType) => {
     setSelectedDevice(device);
   };
 
   // Get terminology based on selected device
-  const getTerminology = () => {
-    if (selectedDevice === 'Q-DENS') {
+  const terminology = useMemo(() => {
+    if (selectedDevice === "Q-DENS") {
       return {
-        measurement: 'densidad',
-        measurementCap: 'Densidad',
-        unit: 'g/cm³',
-        deviceName: 'Densímetro',
-        parameter: 'density',
-        chartTitle: 'Densidad',
-        batchDescription: 'Batch density measurement and monitoring'
+        measurement: "densidad",
+        measurementCap: "Densidad",
+        unit: "g/cm³",
+        deviceName: "Densímetro",
+        batchDescription: "Batch density measurement and monitoring",
       };
     }
     return {
-      measurement: 'viscosidad',
-      measurementCap: 'Viscosidad',
-      unit: 'cP',
-      deviceName: 'Viscosímetro',
-      parameter: 'viscosity',
-      chartTitle: 'Viscosidad',
-      batchDescription: 'Batch viscosity measurement and monitoring'
+      measurement: "viscosidad",
+      measurementCap: "Viscosidad",
+      unit: "cP",
+      deviceName: "Viscosímetro",
+      batchDescription: "Batch viscosity measurement and monitoring",
     };
-  };
+  }, [selectedDevice]);
 
-  const terminology = getTerminology();
+  const scheduleLabels = useMemo(() => {
+    const today = new Date();
+    const lastCalibration = new Date(today);
+    lastCalibration.setMonth(today.getMonth() - 3);
+    const nextCalibration = new Date(today);
+    nextCalibration.setMonth(today.getMonth() + 3);
+    const nextService = new Date(today);
+    nextService.setMonth(today.getMonth() + 6);
+
+    return {
+      lastCalibration: formatDateLabel(lastCalibration),
+      nextCalibration: formatDateLabel(nextCalibration),
+      nextService: formatDateLabel(nextService),
+    };
+  }, []);
 
   // Prepare data for charts
   const viscosityData = historicalData.map((d) => ({
@@ -503,11 +390,11 @@ export default function App() {
                 </div>
                 <div className="info-row">
                   <span>Última calibración</span>
-                  <strong>15 dic 2024</strong>
+                  <strong>{scheduleLabels.lastCalibration}</strong>
                 </div>
                 <div className="info-row">
                   <span>Próxima calibración</span>
-                  <strong>15 mar 2025</strong>
+                  <strong>{scheduleLabels.nextCalibration}</strong>
                 </div>
               </div>
 
@@ -871,8 +758,8 @@ export default function App() {
 
           <DeviceStatus
             isMeasuring={isMeasuring}
-            onMeasure={handleMeasurement}
-            onReset={handleReset}
+            onMeasure={startSimulatedMeasurement}
+            onReset={resetSession}
             connectionStatus={connectionStatus}
             lastUpdate={currentData.timestamp}
             measurementCount={measurementCount}
@@ -956,11 +843,11 @@ export default function App() {
             </div>
             <div className="info-row">
               <span>Último servicio</span>
-              <strong>15 dic 2024</strong>
+              <strong>{scheduleLabels.lastCalibration}</strong>
             </div>
             <div className="info-row">
               <span>Próximo servicio</span>
-              <strong>15 jun 2025</strong>
+              <strong>{scheduleLabels.nextService}</strong>
             </div>
             <div className="info-row">
               <span>Rango de barras de error</span>
