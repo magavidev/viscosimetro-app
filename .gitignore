@@ -5,6 +5,8 @@
 dist/
 build/
 *.spec
+!viscosimetro_app.spec
+.release/
 
 # Archivos de sistema
 __pycache__/
