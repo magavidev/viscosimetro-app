@@ -16,7 +16,7 @@ Aplicación de control para viscosímetro/densímetro con:
 
 1. `main.py` valida que exista `ui-viscosimetro/dist`.
 2. `main.py` intenta conectar Arduino.
-3. Si Arduino está conectado, levanta:
+3. Si Arduino está conectado, o si `VISC_ALLOW_NO_DEVICE=1`, levanta:
    - HTTP para frontend estático (`8780` por defecto).
    - WebSocket (`8781` por defecto).
 
@@ -27,6 +27,8 @@ Aplicación de control para viscosímetro/densímetro con:
 - `VISC_WS_HOST` (default: `"localhost"`)
 - `VISC_WS_PORT` (default: `8781`)
 - `VISC_OPEN_BROWSER` (default: `1`)
+- `VISC_ALLOW_NO_DEVICE` (default: `0`)
+  - Con `1`, permite arrancar backend para desarrollo aunque no haya Arduino conectado.
 
 ## Desarrollo frontend
 

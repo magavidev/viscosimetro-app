@@ -14,6 +14,7 @@ WS_HOST = os.getenv("VISC_WS_HOST", "localhost")
 HTTP_PORT = int(os.getenv("VISC_HTTP_PORT", "8780"))
 WS_PORT = int(os.getenv("VISC_WS_PORT", "8781"))
 OPEN_BROWSER = os.getenv("VISC_OPEN_BROWSER", "1").lower() in {"1", "true", "yes"}
+ALLOW_NO_DEVICE = os.getenv("VISC_ALLOW_NO_DEVICE", "0").lower() in {"1", "true", "yes"}
 BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "ui-viscosimetro", "dist")
 
@@ -80,9 +81,17 @@ if __name__ == "__main__":
             )
 
         # Iniciar comunicación serial
-        serial.connect()
-        serial.add_callback(on_serial_data)
-        serial.start_listening()
+        try:
+            serial.connect()
+            serial.add_callback(on_serial_data)
+            serial.start_listening()
+        except Exception as serial_error:
+            if not ALLOW_NO_DEVICE:
+                raise
+            print(
+                "⚠️ Arduino no encontrado. Continuando en modo desarrollo "
+                f"sin dispositivo porque VISC_ALLOW_NO_DEVICE=1 ({serial_error})."
+            )
 
         # Guardamos el event loop PRINCIPAL antes de lanzarlo
         loop = asyncio.new_event_loop()
