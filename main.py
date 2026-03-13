@@ -8,6 +8,11 @@ import webbrowser
 from bridge.serial_manager import SerialManager
 import websockets
 
+if os.name == "nt":
+    import msvcrt
+else:
+    msvcrt = None
+
 # Configuración base (se puede ajustar con variables de entorno)
 HTTP_HOST = os.getenv("VISC_HTTP_HOST", "")
 WS_HOST = os.getenv("VISC_WS_HOST", "localhost")
@@ -25,6 +30,28 @@ connected_clients = set()
 # Guardaremos el loop principal aquí
 loop = None
 
+
+def pause_before_exit():
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return
+
+    print()
+    print("Presione cualquier tecla para cerrar...")
+    try:
+        if msvcrt is not None:
+            msvcrt.getch()
+    except Exception:
+        pass
+
+
+def report_startup_error(error):
+    message = str(error)
+    if message == "Arduino no encontrado":
+        print("[ERROR] El viscosimetro no esta conectado al computador.")
+        print("[INFO] Conecte el equipo por USB y vuelva a intentarlo.")
+    else:
+        print(f"[ERROR] Error al iniciar sistema: {message}")
+
 # === Servidor Web ===
 class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -38,27 +65,27 @@ class ReusableTCPServer(socketserver.TCPServer):
 def start_http_server():
     try:
         with ReusableTCPServer((HTTP_HOST, HTTP_PORT), Handler) as httpd:
-            print(f"🌐 Servidor web activo en http://localhost:{HTTP_PORT}")
+            print(f"[HTTP] Servidor web activo en http://localhost:{HTTP_PORT}")
             if OPEN_BROWSER:
                 webbrowser.open(f"http://localhost:{HTTP_PORT}")
             httpd.serve_forever()
     except OSError:
-        print(f"⚠️ Puerto {HTTP_PORT} ya está en uso. Cierra la otra app o cambia el puerto.")
+        print(f"[WARN] Puerto {HTTP_PORT} ya esta en uso. Cierra la otra app o cambia el puerto.")
 
 # === Manejo WebSocket ===
 async def handle_ws(websocket):
-    print("🔌 Cliente WebSocket conectado")
+    print("[WS] Cliente WebSocket conectado")
     connected_clients.add(websocket)
 
     try:
         await websocket.wait_closed()
     finally:
         connected_clients.discard(websocket)
-        print("❌ Cliente WebSocket desconectado")
+        print("[WS] Cliente WebSocket desconectado")
 
 async def start_ws():
     async with websockets.serve(handle_ws, WS_HOST, WS_PORT):
-        print(f"📡 WebSocket activo en ws://{WS_HOST or 'localhost'}:{WS_PORT}")
+        print(f"[WS] WebSocket activo en ws://{WS_HOST or 'localhost'}:{WS_PORT}")
         await asyncio.Future()  # Mantener servidor corriendo
 
 # === Callback para cuando llegan datos del Arduino ===
@@ -89,7 +116,7 @@ if __name__ == "__main__":
             if not ALLOW_NO_DEVICE:
                 raise
             print(
-                "⚠️ Arduino no encontrado. Continuando en modo desarrollo "
+                "[WARN] Arduino no encontrado. Continuando en modo desarrollo "
                 f"sin dispositivo porque VISC_ALLOW_NO_DEVICE=1 ({serial_error})."
             )
 
@@ -104,9 +131,10 @@ if __name__ == "__main__":
         loop.run_until_complete(start_ws())
 
     except KeyboardInterrupt:
-        print("\n🛑 Cierre solicitado por usuario.")
+        print("\n[INFO] Cierre solicitado por usuario.")
     except Exception as e:
-        print(f"❌ Error al iniciar sistema: {e}")
+        report_startup_error(e)
+        pause_before_exit()
     finally:
         try:
             serial.close()
