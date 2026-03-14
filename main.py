@@ -6,6 +6,7 @@ import os
 import sys
 import webbrowser
 from bridge.serial_manager import SerialManager
+from bridge.serial_port_dialog import prompt_for_serial_port
 import websockets
 
 if os.name == "nt":
@@ -31,6 +32,10 @@ connected_clients = set()
 loop = None
 
 
+class StartupCancelled(Exception):
+    pass
+
+
 def pause_before_exit():
     if os.name != "nt" or not getattr(sys, "frozen", False):
         return
@@ -49,8 +54,38 @@ def report_startup_error(error):
     if message == "Arduino no encontrado":
         print("[ERROR] El viscosimetro no esta conectado al computador.")
         print("[INFO] Conecte el equipo por USB y vuelva a intentarlo.")
+    elif message == "Inicio cancelado por el usuario":
+        print("[INFO] Inicio cancelado por el usuario.")
     else:
         print(f"[ERROR] Error al iniciar sistema: {message}")
+
+
+def connect_serial_with_dialog():
+    try:
+        serial.connect()
+        return
+    except Exception as initial_error:
+        if ALLOW_NO_DEVICE:
+            print(
+                "[WARN] Arduino no encontrado. Continuando en modo desarrollo "
+                f"sin dispositivo porque VISC_ALLOW_NO_DEVICE=1 ({initial_error})."
+            )
+            return
+
+        last_error = initial_error
+        while True:
+            selected_port = prompt_for_serial_port(
+                load_ports=serial.list_available_ports,
+                error_message=str(last_error),
+            )
+            if not selected_port:
+                raise StartupCancelled("Inicio cancelado por el usuario")
+
+            try:
+                serial.connect(port=selected_port)
+                return
+            except Exception as connect_error:
+                last_error = connect_error
 
 # === Servidor Web ===
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -108,17 +143,10 @@ if __name__ == "__main__":
             )
 
         # Iniciar comunicación serial
-        try:
-            serial.connect()
+        connect_serial_with_dialog()
+        if serial.serial and serial.serial.is_open:
             serial.add_callback(on_serial_data)
             serial.start_listening()
-        except Exception as serial_error:
-            if not ALLOW_NO_DEVICE:
-                raise
-            print(
-                "[WARN] Arduino no encontrado. Continuando en modo desarrollo "
-                f"sin dispositivo porque VISC_ALLOW_NO_DEVICE=1 ({serial_error})."
-            )
 
         # Guardamos el event loop PRINCIPAL antes de lanzarlo
         loop = asyncio.new_event_loop()
@@ -132,6 +160,8 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("\n[INFO] Cierre solicitado por usuario.")
+    except StartupCancelled as e:
+        report_startup_error(e)
     except Exception as e:
         report_startup_error(e)
         pause_before_exit()

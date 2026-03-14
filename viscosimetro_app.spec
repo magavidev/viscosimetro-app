@@ -1,12 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
+import sys
 
 from PyInstaller.utils.hooks import collect_submodules
 
 
 project_root = Path(SPECPATH).resolve()
 frontend_dist = project_root / "ui-viscosimetro" / "dist"
+runtime_bin_dir = Path(sys.base_prefix) / "Library" / "bin"
 
 if not frontend_dist.is_dir():
     raise FileNotFoundError(
@@ -23,10 +25,34 @@ datas = [
     (str(frontend_dist), "ui-viscosimetro/dist"),
 ]
 
+
+def collect_windows_runtime_binaries():
+    if sys.platform != "win32":
+        return []
+
+    binary_names = (
+        "ffi-8.dll",
+        "libbz2.dll",
+        "libcrypto-3-x64.dll",
+        "liblzma.dll",
+        "libssl-3-x64.dll",
+        "tcl86t.dll",
+        "tk86t.dll",
+    )
+    binaries = []
+    for binary_name in binary_names:
+        binary_path = runtime_bin_dir / binary_name
+        if binary_path.is_file():
+            binaries.append((str(binary_path), "."))
+    return binaries
+
+
+binaries = collect_windows_runtime_binaries()
+
 a = Analysis(
     [str(project_root / "main.py")],
     pathex=[str(project_root)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
