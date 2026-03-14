@@ -160,6 +160,20 @@
   background: rgba(255, 241, 244, 0.8);
 }
 
+.status-dropdown-action.shutdown {
+  color: #3d45aa;
+  border-bottom: 1px solid #eceef7;
+}
+
+.status-dropdown-action.shutdown:hover {
+  background: rgba(234, 236, 255, 0.8);
+}
+
+.status-dropdown-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .footer-wrap {
   width: 100%;
   padding: 0 1.5rem 1.5rem;

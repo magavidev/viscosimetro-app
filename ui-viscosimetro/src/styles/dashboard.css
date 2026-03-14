@@ -301,6 +301,11 @@
   color: #d2455d;
 }
 
+.metric-status.no-data {
+  background: rgba(124, 129, 161, 0.14);
+  color: #5d6488;
+}
+
 .metric-trend {
   font-size: 0.8rem;
   color: #7a7f98;
@@ -348,6 +353,13 @@
   background: #f7f8fe;
   color: #141624;
   border: 1px solid #e5e7f5;
+}
+
+.device-control-hint {
+  margin: 0;
+  color: #70789a;
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .device-control-meta {
@@ -592,4 +604,121 @@
   background: rgba(210, 69, 93, 0.12);
   border-color: rgba(210, 69, 93, 0.25);
   color: #d2455d;
+}
+
+.serial-debug-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.serial-debug-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.serial-debug-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #141624;
+}
+
+.serial-debug-chip {
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  background: rgba(90, 99, 204, 0.1);
+  color: #3d45aa;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.serial-debug-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  color: #676f93;
+  font-size: 0.82rem;
+}
+
+.serial-debug-current-raw {
+  border-radius: 14px;
+  border: 1px solid #eceef7;
+  background: #f7f8fe;
+  padding: 0.8rem 1rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.serial-debug-current-raw strong {
+  color: #2a2f47;
+  font-size: 0.82rem;
+}
+
+.serial-debug-current-raw code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  color: #2f3552;
+}
+
+.serial-debug-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+@media (min-width: 960px) {
+  .serial-debug-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.serial-debug-block {
+  border-radius: 14px;
+  border: 1px solid #eceef7;
+  background: #ffffff;
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.serial-debug-block h4 {
+  margin: 0;
+  color: #1e2338;
+  font-size: 0.85rem;
+}
+
+.serial-debug-block p {
+  margin: 0;
+  color: #737a97;
+  font-size: 0.82rem;
+}
+
+.serial-debug-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.serial-debug-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  border: 1px solid #eceef7;
+  border-radius: 10px;
+  background: #fbfcff;
+  padding: 0.45rem 0.6rem;
+}
+
+.serial-debug-item span {
+  color: #6f7693;
+  font-size: 0.8rem;
+}
+
+.serial-debug-item strong {
+  color: #1c2239;
+  font-size: 0.82rem;
+  font-weight: 600;
 }

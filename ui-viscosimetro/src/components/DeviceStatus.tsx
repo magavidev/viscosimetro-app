@@ -4,8 +4,10 @@ interface DeviceStatusProps {
   isMeasuring: boolean;
   onMeasure: () => void;
   onReset: () => void;
+  canMeasure: boolean;
+  measurementHint: string;
   connectionStatus: ConnectionStatus;
-  lastUpdate: Date;
+  lastUpdate: Date | null;
   measurementCount: number;
 }
 
@@ -19,6 +21,8 @@ export function DeviceStatus({
   isMeasuring,
   onMeasure,
   onReset,
+  canMeasure,
+  measurementHint,
   connectionStatus,
   lastUpdate,
   measurementCount,
@@ -34,29 +38,32 @@ export function DeviceStatus({
           type="button"
           className="control-button primary"
           onClick={onMeasure}
-          disabled={isMeasuring || connectionStatus !== "connected"}
+          disabled={isMeasuring || !canMeasure}
         >
-          {isMeasuring ? "Generando lectura..." : "Iniciar medición"}
+          {isMeasuring ? "Esperando lectura serial..." : "Iniciar medición"}
         </button>
         <button
           type="button"
           className="control-button outline"
           onClick={onReset}
-          disabled={isMeasuring}
         >
           Reiniciar sesión
         </button>
       </div>
 
+      <p className="device-control-hint">{measurementHint}</p>
+
       <div className="device-control-meta">
         <span>Lecturas acumuladas: <strong>{measurementCount}</strong></span>
         <span>
           Última actualización:{" "}
-          {lastUpdate.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          })}
+          {lastUpdate
+            ? lastUpdate.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })
+            : "Sin medición"}
         </span>
       </div>
     </section>

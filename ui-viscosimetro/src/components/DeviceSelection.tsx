@@ -11,9 +11,17 @@ interface DeviceSelectionProps {
     role: string;
   } | null;
   onLogout?: () => void;
+  onShutdownApp?: () => void;
+  isShuttingDown?: boolean;
 }
 
-export function DeviceSelection({ onDeviceSelect, currentUser, onLogout }: DeviceSelectionProps) {
+export function DeviceSelection({
+  onDeviceSelect,
+  currentUser,
+  onLogout,
+  onShutdownApp,
+  isShuttingDown = false,
+}: DeviceSelectionProps) {
   const userSubtitle =
     currentUser?.role === "Administrador"
       ? "Administre usuarios del sistema y configure contraseñas"
@@ -29,6 +37,8 @@ export function DeviceSelection({ onDeviceSelect, currentUser, onLogout }: Devic
           deviceModel="Esperando selección..."
           serialNumber="--"
           onLogout={onLogout}
+          onShutdownApp={onShutdownApp}
+          isShuttingDown={isShuttingDown}
         />
       </div>
 

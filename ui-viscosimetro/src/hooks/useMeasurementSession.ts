@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type {
   DeviceType,
   HistoricalDataPoint,
@@ -27,7 +27,6 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
   const [currentData, setCurrentData] = useState<MeasurementData>(EMPTY_MEASUREMENT);
   const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [measurementCount, setMeasurementCount] = useState(0);
-  const measurementTimerRef = useRef<number | null>(null);
 
   const applyReading = useCallback((reading: IncomingMeasurement) => {
     const timestamp = reading.timestamp ?? new Date();
@@ -52,38 +51,15 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
     setIsMeasuring(false);
   }, []);
 
-  const generateSimulatedReading = useCallback(() => {
-    const isQDENS = selectedDevice === "Q-DENS";
-    return {
-      viscosity: isQDENS
-        ? Number((0.8 + Math.random() * 0.4).toFixed(3))
-        : Number((80 + Math.random() * 80).toFixed(2)),
-      temperature: Number((20 + Math.random() * 10).toFixed(2)),
-      standardDeviation: isQDENS
-        ? Number((0.001 + Math.random() * 0.004).toFixed(4))
-        : Number((0.5 + Math.random() * 2).toFixed(2)),
-      timestamp: new Date(),
-    };
-  }, [selectedDevice]);
-
-  const startSimulatedMeasurement = useCallback(() => {
-    if (isMeasuring || measurementTimerRef.current !== null) {
+  const startMeasurement = useCallback(() => {
+    if (isMeasuring) {
       return;
     }
 
     setIsMeasuring(true);
-    measurementTimerRef.current = window.setTimeout(() => {
-      measurementTimerRef.current = null;
-      applyReading(generateSimulatedReading());
-    }, 3000);
-  }, [applyReading, generateSimulatedReading, isMeasuring]);
+  }, [isMeasuring]);
 
   const resetSession = useCallback(() => {
-    if (measurementTimerRef.current !== null) {
-      window.clearTimeout(measurementTimerRef.current);
-      measurementTimerRef.current = null;
-    }
-
     setIsMeasuring(false);
     setCurrentData({
       viscosity: 0,
@@ -94,16 +70,6 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
     setHistoricalData([]);
     setMeasurementCount(0);
   }, []);
-
-  useEffect(
-    () => () => {
-      if (measurementTimerRef.current !== null) {
-        window.clearTimeout(measurementTimerRef.current);
-        measurementTimerRef.current = null;
-      }
-    },
-    [],
-  );
 
   const getViscosityStatus = useCallback(
     (viscosity: number): MetricStatus => {
@@ -190,7 +156,7 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
     measurementCount,
     hasWarnings,
     applyReading,
-    startSimulatedMeasurement,
+    startMeasurement,
     resetSession,
     getViscosityStatus,
     getTemperatureStatus,

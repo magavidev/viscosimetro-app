@@ -7,6 +7,7 @@ interface MeasurementCardProps {
   status: "normal" | "warning" | "critical";
   icon: React.ReactNode;
   trend: "up" | "down" | "stable";
+  hasValue?: boolean;
 }
 
 const trendCopy: Record<MeasurementCardProps["trend"], string> = {
@@ -22,7 +23,18 @@ export function MeasurementCard({
   status,
   icon,
   trend,
+  hasValue = true,
 }: MeasurementCardProps) {
+  const showValue = hasValue;
+  const statusClass = showValue ? `metric-status ${status}` : "metric-status no-data";
+  const statusText = showValue
+    ? status === "normal"
+      ? "En rango"
+      : status === "warning"
+      ? "Atención"
+      : "Fuera de rango"
+    : "Sin medición";
+
   return (
     <article className="metric-card">
       <div className="metric-card-header">
@@ -30,15 +42,11 @@ export function MeasurementCard({
         <span>{icon}</span>
       </div>
       <div>
-        <span className="metric-value">{value.toFixed(2)}</span>
+        <span className="metric-value">{showValue ? value.toFixed(2) : "--"}</span>
         <span className="metric-unit"> {unit}</span>
       </div>
-      <div className={`metric-status ${status}`}>
-        {status === "normal" && "En rango"}
-        {status === "warning" && "Atención"}
-        {status === "critical" && "Fuera de rango"}
-      </div>
-      <div className="metric-trend">{trendCopy[trend]}</div>
+      <div className={statusClass}>{statusText}</div>
+      <div className="metric-trend">{showValue ? trendCopy[trend] : "Sin medición"}</div>
     </article>
   );
 }

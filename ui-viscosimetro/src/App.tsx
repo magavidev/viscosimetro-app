@@ -31,6 +31,19 @@ const formatDateLabel = (date: Date) =>
     year: "numeric",
   });
 
+const formatTimeLabel = (raw: string | null) => {
+  if (!raw) {
+    return "Sin datos";
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return "Sin datos";
+  }
+
+  return date.toLocaleTimeString("es-CL");
+};
+
 export default function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,6 +69,7 @@ export default function App() {
   const [view, setView] = useState<
     "landing" | "realtime" | "data" | "calibration" | "settings"
   >("landing");
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
 
   // Calibration-specific state
   const [showPatternModal, setShowPatternModal] = useState(false);
@@ -80,7 +94,7 @@ export default function App() {
     measurementCount,
     hasWarnings,
     applyReading,
-    startSimulatedMeasurement,
+    startMeasurement,
     resetSession,
     getViscosityStatus,
     getTemperatureStatus,
@@ -88,10 +102,91 @@ export default function App() {
     getTrend,
   } = useMeasurementSession(selectedDevice);
 
-  const { connectionStatus } = useDeviceWebSocket({
+  const { connectionStatus, serialDebug } = useDeviceWebSocket({
     enabled: isAuthenticated && selectedDevice !== null,
     onReading: applyReading,
   });
+
+  const shutdownEndpoint = useMemo(() => {
+    const configuredUrl = (import.meta.env.VITE_BACKEND_HTTP_URL as string | undefined)?.trim();
+    if (configuredUrl) {
+      return `${configuredUrl.replace(/\/+$/, "")}/api/shutdown`;
+    }
+
+    if (typeof window !== "undefined" && window.location.port === "5173") {
+      return "http://localhost:8780/api/shutdown";
+    }
+
+    return "/api/shutdown";
+  }, []);
+
+  const latestLabelEntries = useMemo(
+    () =>
+      Object.entries(serialDebug.latestByLabel)
+        .map(([key, value]) => ({
+          key,
+          value: value.value,
+          updatedAt: value.updatedAt,
+        }))
+        .sort((a, b) => {
+          if (a.updatedAt === b.updatedAt) {
+            return a.key.localeCompare(b.key);
+          }
+          return b.updatedAt.localeCompare(a.updatedAt);
+        }),
+    [serialDebug.latestByLabel],
+  );
+
+  const hasSerialError = serialDebug.lastMessageHasError;
+  const telemetryReady = serialDebug.lastMessageHasTelemetry && !hasSerialError;
+  const canMeasure = connectionStatus === "connected" && telemetryReady;
+  const hasMeasurementData = telemetryReady && measurementCount > 0;
+
+  const measurementHint = useMemo(() => {
+    if (connectionStatus !== "connected") {
+      return "Conecte el equipo para iniciar una medición.";
+    }
+    if (hasSerialError) {
+      return "Sin medición detectada: la última trama serial reporta error.";
+    }
+    if (!serialDebug.lastMessageHasTelemetry) {
+      return "Sin medición detectada: esperando variables válidas (ej. VISC/TEMP).";
+    }
+    if (isMeasuring) {
+      return "Esperando próxima lectura serial para confirmar la medición.";
+    }
+    return "Telemetría válida detectada. Puede iniciar una medición.";
+  }, [connectionStatus, hasSerialError, isMeasuring, serialDebug.lastMessageHasTelemetry]);
+
+  const measurementMessage = useMemo(() => {
+    if (!hasMeasurementData) {
+      if (hasSerialError) {
+        return "Sin medición detectada. Se recibió un error desde el puerto serial.";
+      }
+      if (connectionStatus !== "connected") {
+        return "Sin medición detectada. El dispositivo está desconectado.";
+      }
+      return "Sin medición detectada. Esperando telemetría válida desde el serial.";
+    }
+
+    if (hasWarnings) {
+      return "Se detectaron lecturas fuera de rango. Revise los parámetros y confirme la estabilidad del proceso.";
+    }
+
+    return null;
+  }, [connectionStatus, hasMeasurementData, hasSerialError, hasWarnings]);
+
+  const displayData = hasMeasurementData
+    ? currentData
+    : {
+        viscosity: 0,
+        temperature: 0,
+        standardDeviation: 0,
+        timestamp: new Date(),
+      };
+
+  const displayHistory = hasMeasurementData ? historicalData : [];
+  const displayMeasurementCount = hasMeasurementData ? measurementCount : 0;
 
   // Calibration functions
   const startEvaluation = () => {
@@ -131,6 +226,7 @@ export default function App() {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setSelectedDevice(null);
+    setIsShuttingDown(false);
     setView("landing");
     resetSession();
     // Reset other states
@@ -141,6 +237,34 @@ export default function App() {
     setIsEvaluating(false);
     setEvaluationResult(null);
     setHasEvaluated(false);
+  };
+
+  const handleShutdownApp = async () => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    const confirmed = window.confirm("¿Desea cerrar la aplicación ahora?");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsShuttingDown(true);
+    try {
+      const response = await fetch(shutdownEndpoint, { method: "POST" });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error("[UI] No se pudo solicitar el cierre de la app", error);
+      setIsShuttingDown(false);
+      window.alert("No se pudo cerrar la aplicación. Revise que el backend esté activo.");
+      return;
+    }
+
+    window.setTimeout(() => {
+      setIsShuttingDown(false);
+    }, 8000);
   };
 
   // Device selection function
@@ -185,13 +309,13 @@ export default function App() {
   }, []);
 
   // Prepare data for charts
-  const viscosityData = historicalData.map((d) => ({
+  const viscosityData = displayHistory.map((d) => ({
     time: d.time,
     viscosity: d.viscosity,
     standardDeviation: d.standardDeviation,
   }));
 
-  const temperatureData = historicalData.map((d) => ({
+  const temperatureData = displayHistory.map((d) => ({
     time: d.time,
     temperature: d.temperature,
   }));
@@ -203,7 +327,15 @@ export default function App() {
 
   // ------------------ DEVICE SELECTION SCREEN ------------------
   if (!selectedDevice) {
-    return <DeviceSelection onDeviceSelect={handleDeviceSelection} currentUser={currentUser} onLogout={handleLogout} />;
+    return (
+      <DeviceSelection
+        onDeviceSelect={handleDeviceSelection}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onShutdownApp={handleShutdownApp}
+        isShuttingDown={isShuttingDown}
+      />
+    );
   }
 
   // ------------------ LANDING PAGE ------------------
@@ -215,6 +347,8 @@ export default function App() {
           userName={currentUser?.username}
           userRole={currentUser?.role}
           onLogout={handleLogout}
+          onShutdownApp={handleShutdownApp}
+          isShuttingDown={isShuttingDown}
         />
         <main className="landing-main">
           <section className="landing-hero">
@@ -286,6 +420,8 @@ export default function App() {
           userName={currentUser?.username}
           userRole={currentUser?.role}
           onLogout={handleLogout}
+          onShutdownApp={handleShutdownApp}
+          isShuttingDown={isShuttingDown}
         />
         <main className="page-main">
           <header className="page-header">
@@ -452,6 +588,8 @@ export default function App() {
           userName={currentUser?.username}
           userRole={currentUser?.role}
           onLogout={handleLogout}
+          onShutdownApp={handleShutdownApp}
+          isShuttingDown={isShuttingDown}
         />
         <main className="page-main">
           <header className="page-header">
@@ -611,6 +749,8 @@ export default function App() {
           userName={currentUser?.username}
           userRole={currentUser?.role}
           onLogout={handleLogout}
+          onShutdownApp={handleShutdownApp}
+          isShuttingDown={isShuttingDown}
         />
         <main className="page-main">
           <header className="page-header">
@@ -710,6 +850,8 @@ export default function App() {
         userName={currentUser?.username}
         userRole={currentUser?.role}
         onLogout={handleLogout}
+        onShutdownApp={handleShutdownApp}
+        isShuttingDown={isShuttingDown}
       />
       <main className="page-main">
         <header className="page-header">
@@ -722,47 +864,105 @@ export default function App() {
           </button>
         </header>
 
-        {hasWarnings && (
+        <section className="panel serial-debug-panel">
+          <div className="serial-debug-header">
+            <h3>Telemetría serial entrante (debug)</h3>
+            <span className="serial-debug-chip">
+              {serialDebug.messageCount} tramas recibidas
+            </span>
+          </div>
+
+          <div className="serial-debug-meta">
+            <span>Última recepción: {formatTimeLabel(serialDebug.lastReceivedAt)}</span>
+            <span>Etiquetas detectadas: {latestLabelEntries.length}</span>
+          </div>
+
+          <div className="serial-debug-current-raw">
+            <strong>Última trama serial</strong>
+            <code>{serialDebug.lastRawMessage || "Sin mensajes serial aún."}</code>
+          </div>
+
+          <div className="serial-debug-grid">
+            <div className="serial-debug-block">
+              <h4>Etiquetas de la última trama</h4>
+              {serialDebug.lastMessageLabels.length === 0 ? (
+                <p>No se identificaron etiquetas en el último mensaje.</p>
+              ) : (
+                <div className="serial-debug-list">
+                  {serialDebug.lastMessageLabels.map((entry, index) => (
+                    <div key={`last-${entry.key}-${index}`} className="serial-debug-item">
+                      <span>{entry.key}</span>
+                      <strong>{entry.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="serial-debug-block">
+              <h4>Último valor por etiqueta</h4>
+              {latestLabelEntries.length === 0 ? (
+                <p>Aún no hay etiquetas detectadas.</p>
+              ) : (
+                <div className="serial-debug-list">
+                  {latestLabelEntries.map((entry) => (
+                    <div key={`latest-${entry.key}`} className="serial-debug-item">
+                      <span>{entry.key}</span>
+                      <strong>{entry.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {measurementMessage && (
           <div className="panel panel--muted">
-            Se detectaron lecturas fuera de rango. Revise los parámetros y confirme la estabilidad del proceso.
+            {measurementMessage}
           </div>
         )}
 
         <section className="metric-grid">
           <MeasurementCard
             title={terminology.measurementCap}
-            value={currentData.viscosity}
+            value={displayData.viscosity}
             unit={terminology.unit}
-            status={getViscosityStatus(currentData.viscosity)}
+            status={getViscosityStatus(displayData.viscosity)}
             icon={<Gauge size={16} />}
             trend={getTrend("viscosity")}
+            hasValue={hasMeasurementData}
           />
 
           <MeasurementCard
             title="Desviación estándar"
-            value={currentData.standardDeviation}
+            value={displayData.standardDeviation}
             unit="σ"
-            status={getStdDevStatus(currentData.standardDeviation)}
+            status={getStdDevStatus(displayData.standardDeviation)}
             icon={<TrendingUp size={16} />}
             trend={getTrend("standardDeviation")}
+            hasValue={hasMeasurementData}
           />
 
           <MeasurementCard
             title="Temperatura"
-            value={currentData.temperature}
+            value={displayData.temperature}
             unit="°C"
-            status={getTemperatureStatus(currentData.temperature)}
+            status={getTemperatureStatus(displayData.temperature)}
             icon={<Thermometer size={16} />}
             trend={getTrend("temperature")}
+            hasValue={hasMeasurementData}
           />
 
           <DeviceStatus
             isMeasuring={isMeasuring}
-            onMeasure={startSimulatedMeasurement}
+            onMeasure={startMeasurement}
             onReset={resetSession}
+            canMeasure={canMeasure}
+            measurementHint={measurementHint}
             connectionStatus={connectionStatus}
-            lastUpdate={currentData.timestamp}
-            measurementCount={measurementCount}
+            lastUpdate={hasMeasurementData ? currentData.timestamp : null}
+            measurementCount={displayMeasurementCount}
           />
         </section>
 
@@ -783,18 +983,20 @@ export default function App() {
             <h3>Resumen de sesión</h3>
             <div className="info-row">
               <span>Lotes capturados</span>
-              <strong>{measurementCount}</strong>
+              <strong>{displayMeasurementCount}</strong>
             </div>
             <div className="info-row">
               <span>Estado actual</span>
-              <strong>{isMeasuring ? "Registrando" : "Listo"}</strong>
+              <strong>
+                {hasMeasurementData ? (isMeasuring ? "Registrando" : "Listo") : "Sin medición detectada"}
+              </strong>
             </div>
             <div className="info-row">
               <span>Promedio {terminology.measurementCap}</span>
               <strong>
-                {historicalData.length > 0
+                {displayHistory.length > 0
                   ? (
-                      historicalData.reduce((sum, d) => sum + d.viscosity, 0) / historicalData.length
+                      displayHistory.reduce((sum, d) => sum + d.viscosity, 0) / displayHistory.length
                     ).toFixed(selectedDevice === "Q-DENS" ? 3 : 1)
                   : selectedDevice === "Q-DENS" ? "0.000" : "0.0"} {terminology.unit}
               </strong>
@@ -802,10 +1004,10 @@ export default function App() {
             <div className="info-row">
               <span>Desviación estándar promedio</span>
               <strong>
-                {historicalData.length > 0
+                {displayHistory.length > 0
                   ? (
-                      historicalData.reduce((sum, d) => sum + d.standardDeviation, 0) /
-                      historicalData.length
+                      displayHistory.reduce((sum, d) => sum + d.standardDeviation, 0) /
+                      displayHistory.length
                     ).toFixed(2)
                   : "0.00"}
                 σ
@@ -814,9 +1016,9 @@ export default function App() {
             <div className="info-row">
               <span>Temperatura mínima / máxima</span>
               <strong>
-                {historicalData.length > 0
-                  ? `${Math.min(...historicalData.map((d) => d.temperature)).toFixed(1)}°C / ${Math.max(
-                      ...historicalData.map((d) => d.temperature)
+                {displayHistory.length > 0
+                  ? `${Math.min(...displayHistory.map((d) => d.temperature)).toFixed(1)}°C / ${Math.max(
+                      ...displayHistory.map((d) => d.temperature)
                     ).toFixed(1)}°C`
                   : "0.0°C / 0.0°C"}
               </strong>

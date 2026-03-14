@@ -30,6 +30,22 @@ Aplicación de control para viscosímetro/densímetro con:
 - `VISC_OPEN_BROWSER` (default: `1`)
 - `VISC_ALLOW_NO_DEVICE` (default: `0`)
   - Con `1`, permite arrancar backend para desarrollo aunque no haya Arduino conectado.
+- `VISC_SERIAL_PROBE_TIMEOUT` (default: `3.0`)
+  - Tiempo maximo (segundos) para observar datos iniciales al seleccionar un puerto manual.
+- `VISC_SERIAL_PROBE_NON_PREFERRED_ONLY` (default: `0`)
+  - Con `1`, la validacion de telemetria solo se aplica a puertos manuales no detectados como preferidos.
+  - Con `0`, la validacion se aplica a cualquier seleccion manual.
+- `VISC_SERIAL_PROBE_REQUIRE_DATA` (default: `0`)
+  - Con `0`, si no llegan datos durante el timeout inicial, el puerto igual se acepta.
+  - Con `1`, si no llegan datos durante el timeout inicial, se rechaza el puerto.
+- `VISC_SERIAL_PROBE_REJECT_INVALID` (default: `0`)
+  - Con `0`, si llegan datos con formato no reconocido, el puerto igual se acepta.
+  - Con `1`, si llegan datos con formato no reconocido, se rechaza el puerto.
+
+Notas de comportamiento:
+
+- Si el puerto seleccionado manualmente esta marcado como preferido (deteccion tipo Arduino), se acepta sin validacion estricta inicial.
+- Por defecto, la validacion inicial no bloquea el arranque; queda como control opcional via variables de entorno.
 
 ## Desarrollo frontend
 

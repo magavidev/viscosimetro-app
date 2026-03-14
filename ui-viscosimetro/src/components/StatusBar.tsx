@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, LogOut, ChevronDown } from "lucide-react";
+import { User, LogOut, ChevronDown, Power } from "lucide-react";
 import "../styles/status-footer.css";
 
 interface StatusBarProps {
@@ -9,6 +9,8 @@ interface StatusBarProps {
   userName?: string;
   userRole?: string;
   onLogout?: () => void;
+  onShutdownApp?: () => void;
+  isShuttingDown?: boolean;
 }
 
 const statusCopy: Record<StatusBarProps["connectionStatus"], string> = {
@@ -24,6 +26,8 @@ export function StatusBar({
   userName = "admin",
   userRole = "Administrador",
   onLogout,
+  onShutdownApp,
+  isShuttingDown = false,
 }: StatusBarProps) {
   const [open, setOpen] = useState(false);
 
@@ -62,6 +66,18 @@ export function StatusBar({
                 <span className="status-dropdown-name">{userName}</span>
                 <span className="status-dropdown-role">{userRole}</span>
               </div>
+              <button
+                type="button"
+                className="status-dropdown-action shutdown"
+                onClick={() => {
+                  setOpen(false);
+                  onShutdownApp?.();
+                }}
+                disabled={isShuttingDown}
+              >
+                <Power size={16} />
+                {isShuttingDown ? "Cerrando aplicación..." : "Cerrar aplicación"}
+              </button>
               <button
                 type="button"
                 className="status-dropdown-action"
