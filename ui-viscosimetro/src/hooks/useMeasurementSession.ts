@@ -10,6 +10,7 @@ import type {
 
 const EMPTY_MEASUREMENT: MeasurementData = {
   viscosity: 0,
+  meanViscosity: 0,
   temperature: 0,
   standardDeviation: 0,
   timestamp: new Date(),
@@ -32,6 +33,7 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
     const timestamp = reading.timestamp ?? new Date();
     const nextData: MeasurementData = {
       viscosity: reading.viscosity,
+      meanViscosity: reading.meanViscosity ?? reading.viscosity,
       temperature: reading.temperature,
       standardDeviation: reading.standardDeviation ?? 0,
       timestamp,
@@ -63,6 +65,7 @@ export function useMeasurementSession(selectedDevice: DeviceType | null) {
     setIsMeasuring(false);
     setCurrentData({
       viscosity: 0,
+      meanViscosity: 0,
       temperature: 0,
       standardDeviation: 0,
       timestamp: new Date(),

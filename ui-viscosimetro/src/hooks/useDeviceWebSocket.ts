@@ -37,6 +37,27 @@ const INITIAL_SERIAL_DEBUG_INFO: SerialDebugInfo = {
   latestByLabel: {},
 };
 
+const extractRawSerialMessage = (wsMessage: string): string => {
+  if (!wsMessage.trim().startsWith("{")) {
+    return wsMessage;
+  }
+
+  try {
+    const parsed = JSON.parse(wsMessage) as { raw?: unknown };
+    if (typeof parsed.raw === "string" && parsed.raw.trim()) {
+      return parsed.raw.trim();
+    }
+  } catch {
+    // Fallback para sobres no estrictamente JSON (por ejemplo, comillas simples).
+    const rawMatch = wsMessage.match(/["']raw["']\s*:\s*["']([^"']+)["']/i);
+    if (rawMatch?.[1]) {
+      return rawMatch[1].replace(/\\n/g, "\n").trim();
+    }
+  }
+
+  return wsMessage;
+};
+
 export function useDeviceWebSocket({ enabled, onReading }: UseDeviceWebSocketOptions) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [serialDebug, setSerialDebug] = useState<SerialDebugInfo>(INITIAL_SERIAL_DEBUG_INFO);
@@ -59,9 +80,10 @@ export function useDeviceWebSocket({ enabled, onReading }: UseDeviceWebSocketOpt
     };
 
     ws.onmessage = (event) => {
-      const rawMessage = String(event.data ?? "").trim();
+      const wsMessage = String(event.data ?? "").trim();
+      const rawMessage = extractRawSerialMessage(wsMessage);
       const labels = extractSerialLabels(rawMessage);
-      const parsed = parseTelemetryMessage(rawMessage);
+      const parsed = parseTelemetryMessage(wsMessage) ?? parseTelemetryMessage(rawMessage);
       const hasErrorLabel = labels.some((label) => {
         const normalized = label.key.toUpperCase();
         return normalized === "ERROR" || normalized === "ERR";

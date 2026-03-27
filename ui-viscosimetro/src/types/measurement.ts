@@ -5,6 +5,7 @@ export type MetricStatus = "normal" | "warning" | "critical";
 
 export interface MeasurementData {
   viscosity: number;
+  meanViscosity: number;
   temperature: number;
   standardDeviation: number;
   timestamp: Date;
@@ -19,6 +20,7 @@ export interface HistoricalDataPoint {
 
 export interface IncomingMeasurement {
   viscosity: number;
+  meanViscosity?: number;
   temperature: number;
   standardDeviation?: number;
   timestamp?: Date;

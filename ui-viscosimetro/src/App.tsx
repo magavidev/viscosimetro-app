@@ -180,6 +180,7 @@ export default function App() {
     ? currentData
     : {
         viscosity: 0,
+        meanViscosity: 0,
         temperature: 0,
         standardDeviation: 0,
         timestamp: new Date(),
@@ -994,10 +995,8 @@ export default function App() {
             <div className="info-row">
               <span>Promedio {terminology.measurementCap}</span>
               <strong>
-                {displayHistory.length > 0
-                  ? (
-                      displayHistory.reduce((sum, d) => sum + d.viscosity, 0) / displayHistory.length
-                    ).toFixed(selectedDevice === "Q-DENS" ? 3 : 1)
+                {hasMeasurementData
+                  ? displayData.meanViscosity.toFixed(selectedDevice === "Q-DENS" ? 3 : 1)
                   : selectedDevice === "Q-DENS" ? "0.000" : "0.0"} {terminology.unit}
               </strong>
             </div>

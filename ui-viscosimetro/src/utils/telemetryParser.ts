@@ -34,9 +34,50 @@ const parseJsonTelemetry = (raw: string): IncomingMeasurement | null => {
 
   try {
     const parsed = JSON.parse(raw) as JsonLikeRecord;
-    const viscosity = pickFirstNumber(parsed, ["viscosity", "density", "vis", "dens"]);
-    const temperature = pickFirstNumber(parsed, ["temperature", "temp"]);
-    const standardDeviation = pickFirstNumber(parsed, ["standardDeviation", "std", "sigma"]);
+    const telemetryCandidate = parsed.telemetry;
+    const payload =
+      telemetryCandidate && typeof telemetryCandidate === "object" && !Array.isArray(telemetryCandidate)
+        ? (telemetryCandidate as JsonLikeRecord)
+        : parsed;
+
+    const viscosity = pickFirstNumber(payload, [
+      "viscosity",
+      "VISCOSITY",
+      "density",
+      "DENSITY",
+      "vis",
+      "VIS",
+      "dens",
+      "DENS",
+      "VISC",
+    ]);
+    const temperature = pickFirstNumber(payload, [
+      "temperature",
+      "TEMPERATURE",
+      "temp",
+      "TEMP",
+      "t",
+      "T",
+    ]);
+    const standardDeviation = pickFirstNumber(payload, [
+      "standardDeviation",
+      "STD_VISC",
+      "std_visc",
+      "std",
+      "STD",
+      "sigma",
+      "SIGMA",
+      "sd",
+      "SD",
+    ]);
+    const meanViscosity = pickFirstNumber(payload, [
+      "meanViscosity",
+      "mean_viscosity",
+      "M_VICS",
+      "m_vics",
+      "MEAN_VISC",
+      "meanVisc",
+    ]);
 
     if (viscosity === undefined || temperature === undefined) {
       return null;
@@ -44,6 +85,7 @@ const parseJsonTelemetry = (raw: string): IncomingMeasurement | null => {
 
     return {
       viscosity,
+      meanViscosity,
       temperature,
       standardDeviation,
     };
@@ -56,6 +98,7 @@ const parseDelimitedTelemetry = (raw: string): IncomingMeasurement | null => {
   let viscosity: number | undefined;
   let temperature: number | undefined;
   let standardDeviation: number | undefined;
+  let meanViscosity: number | undefined;
 
   const pairs = raw.split(/[;,]/);
   for (const pair of pairs) {
@@ -82,6 +125,11 @@ const parseDelimitedTelemetry = (raw: string): IncomingMeasurement | null => {
 
     if (["STD", "SD", "SIGMA"].includes(key)) {
       standardDeviation = value;
+      continue;
+    }
+
+    if (["M_VICS", "MEAN_VISC", "MEANVISC"].includes(key)) {
+      meanViscosity = value;
     }
   }
 
@@ -91,6 +139,7 @@ const parseDelimitedTelemetry = (raw: string): IncomingMeasurement | null => {
 
   return {
     viscosity,
+    meanViscosity,
     temperature,
     standardDeviation,
   };

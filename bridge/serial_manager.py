@@ -39,6 +39,12 @@ class SerialManager:
             os.getenv("VISC_SERIAL_PROBE_REJECT_INVALID", "0").lower()
             in {"1", "true", "yes"}
         )
+        self._reset_stats()
+
+    def _reset_stats(self):
+        self.measurement_count = 0
+        self._sum_viscosity = 0.0
+        self._sum_viscosity_sq = 0.0
 
     def _load_probe_timeout(self):
         raw_value = os.getenv("VISC_SERIAL_PROBE_TIMEOUT", "3.0")
@@ -100,25 +106,47 @@ class SerialManager:
                 return parsed
         return None
 
-    def _looks_like_json_telemetry(self, raw_line):
+    def _extract_json_telemetry(self, raw_line):
         if not raw_line.startswith("{"):
-            return False
+            return None
 
         try:
             parsed = json.loads(raw_line)
         except json.JSONDecodeError:
-            return False
+            return None
 
         if not isinstance(parsed, dict):
-            return False
+            return None
 
-        viscosity = self._pick_first_number(parsed, ["viscosity", "density", "vis", "dens"])
-        temperature = self._pick_first_number(parsed, ["temperature", "temp"])
-        return viscosity is not None and temperature is not None
+        normalized_payload = {
+            str(key).strip().upper(): value for key, value in parsed.items()
+        }
+        viscosity = self._pick_first_number(
+            normalized_payload, ["VISC", "VISCOSITY", "VIS", "DENS", "DENSITY"]
+        )
+        temperature = self._pick_first_number(
+            normalized_payload, ["TEMP", "TEMPERATURE", "T"]
+        )
 
-    def _looks_like_delimited_telemetry(self, raw_line):
+        if viscosity is None or temperature is None:
+            return None
+
+        return {
+            "viscosity": viscosity,
+            "temperature": temperature,
+            "standard_deviation": self._pick_first_number(
+                normalized_payload, ["STD_VISC", "STD", "SD", "SIGMA"]
+            ),
+            "mean_viscosity": self._pick_first_number(
+                normalized_payload, ["M_VICS", "MEAN_VISC", "MEANVISC"]
+            ),
+        }
+
+    def _extract_delimited_telemetry(self, raw_line):
         viscosity = None
         temperature = None
+        standard_deviation = None
+        mean_viscosity = None
         key_value_pairs = re.split(r"[;,]", raw_line)
         for pair in key_value_pairs:
             tokens = re.split(r"[:=]", pair, maxsplit=1)
@@ -137,13 +165,68 @@ class SerialManager:
             if key in {"TEMP", "TEMPERATURE", "T"}:
                 temperature = value
 
-        return viscosity is not None and temperature is not None
+            if key in {"STD_VISC", "STD", "SD", "SIGMA"}:
+                standard_deviation = value
+                continue
+
+            if key in {"M_VICS", "MEAN_VISC", "MEANVISC"}:
+                mean_viscosity = value
+
+        if viscosity is None or temperature is None:
+            return None
+
+        return {
+            "viscosity": viscosity,
+            "temperature": temperature,
+            "standard_deviation": standard_deviation,
+            "mean_viscosity": mean_viscosity,
+        }
+
+    def _extract_telemetry(self, raw_line):
+        return self._extract_json_telemetry(raw_line) or self._extract_delimited_telemetry(
+            raw_line
+        )
+
+    def _looks_like_json_telemetry(self, raw_line):
+        return self._extract_json_telemetry(raw_line) is not None
+
+    def _looks_like_delimited_telemetry(self, raw_line):
+        return self._extract_delimited_telemetry(raw_line) is not None
 
     def _looks_like_telemetry(self, raw_line):
-        return (
-            self._looks_like_json_telemetry(raw_line)
-            or self._looks_like_delimited_telemetry(raw_line)
-        )
+        return self._extract_telemetry(raw_line) is not None
+
+    def _update_statistics(self, viscosity):
+        self.measurement_count += 1
+        self._sum_viscosity += viscosity
+        self._sum_viscosity_sq += viscosity * viscosity
+
+        mean_viscosity = self._sum_viscosity / self.measurement_count
+        std_viscosity = 0.0
+
+        if self.measurement_count > 1:
+            numerator = self._sum_viscosity_sq - (
+                (self._sum_viscosity * self._sum_viscosity) / self.measurement_count
+            )
+            variance = max(numerator, 0.0) / (self.measurement_count - 1)
+            std_viscosity = math.sqrt(variance)
+
+        return mean_viscosity, std_viscosity
+
+    def _build_outgoing_payload(self, raw_line):
+        payload = {"raw": raw_line}
+        telemetry = self._extract_telemetry(raw_line)
+        if telemetry is None:
+            return payload
+
+        mean_viscosity, std_viscosity = self._update_statistics(telemetry["viscosity"])
+        payload["telemetry"] = {
+            "VISC": telemetry["viscosity"],
+            "TEMP": telemetry["temperature"],
+            "M_VICS": mean_viscosity,
+            "STD_VISC": std_viscosity,
+        }
+        return payload
 
     def _probe_serial_stream(self):
         """
@@ -216,6 +299,7 @@ class SerialManager:
             self.port = None
             self.serial = None
             raise Exception(f"No se pudo abrir el puerto {target_port}: {error}") from error
+        self._reset_stats()
 
         is_preferred_selected = selected_option is not None and selected_option.preferred
         if was_manual_selection and is_preferred_selected:
@@ -279,8 +363,9 @@ class SerialManager:
                 if self.serial.in_waiting:
                     line = self.serial.readline().decode("utf-8", errors="ignore").strip()
                     if line:
+                        outgoing_payload = self._build_outgoing_payload(line)
                         for callback in self.callbacks:
-                            callback(line)
+                            callback(outgoing_payload)
             except Exception as e:
                 print(f"[SerialManager] Error de lectura: {e}")
 
@@ -302,3 +387,4 @@ class SerialManager:
         if self.serial and self.serial.is_open:
             self.serial.close()
             print("[SerialManager] Puerto cerrado")
+        self._reset_stats()

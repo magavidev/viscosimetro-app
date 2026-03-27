@@ -229,12 +229,25 @@ async def close_ws_clients():
 
 # === Callback para cuando llegan datos del Arduino ===
 def on_serial_data(data):
-    print(f"[SerialManager] Recibido: {data}")
+    if isinstance(data, dict):
+        raw_line = str(data.get("raw", "")).strip()
+        telemetry_payload = data.get("telemetry")
+        if isinstance(telemetry_payload, dict):
+            print(
+                "[SerialManager] Recibido RAW: "
+                f"{raw_line} | Calculado: {json.dumps(telemetry_payload, ensure_ascii=True)}"
+            )
+        else:
+            print(f"[SerialManager] Recibido RAW: {raw_line}")
+        outgoing_message = json.dumps(data, ensure_ascii=True)
+    else:
+        outgoing_message = str(data)
+        print(f"[SerialManager] Recibido: {outgoing_message}")
 
     # Enviar a todos los clientes WebSocket conectados
     for ws in list(connected_clients):
         try:
-            asyncio.run_coroutine_threadsafe(ws.send(data), loop)
+            asyncio.run_coroutine_threadsafe(ws.send(outgoing_message), loop)
         except Exception as e:
             print(f"[WS Error] {e}")
 
